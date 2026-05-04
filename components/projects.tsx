@@ -1,8 +1,24 @@
-import React from 'react';
-import { projectsData } from "../lib/mockdata";
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../createClient'
+import { ProjectData } from '@/Types/projectTypes';
 
 
 function Projects() {
+  const [projects, setProjects] = useState<ProjectData[]>([])
+
+    useEffect(()=>{
+      const fetchProject=async()=>{
+        const{data,error}=await supabase.from("projects").select("*");
+        if(error){
+          console.log('Error While Fetching: ',error)
+        }else{
+          setProjects(data||[])
+          console.log("Data",data)
+        }
+      }
+      fetchProject();
+    },[])
+
   return (
     <section className="projects-section" id='projects'>
       <div className="projects-container">
@@ -16,7 +32,7 @@ function Projects() {
         </div>
 
         <div className="projects-grid">
-          {projectsData.map((project) => (
+          {projects.map((project) => (
             <div className="project-card" key={project.id}>
               <div className="project-image">
                 <img src={project.image} alt={project.title} />
@@ -29,7 +45,8 @@ function Projects() {
                 <h3>{project.title}</h3>
                 <p>{project.description}</p>
                 <div className="project-tech">
-                  {project.tech.map((tech, idx) => (
+                  
+                  { project.tech&&project.tech.map((tech, idx) => (
                     <span key={idx} className="tech-tag">{tech}</span>
                   ))}
                 </div>
@@ -39,7 +56,7 @@ function Projects() {
         </div>
 
         <div className="projects-cta">
-          <a href="#" className="btn-outline">View all projects →</a>
+          <a href="https://github.com/mathewsoniala?tab=repositories" className="btn-outline">View all projects →</a>
         </div>
       </div>
     </section>

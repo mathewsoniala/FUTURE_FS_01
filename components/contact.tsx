@@ -4,45 +4,122 @@ import { faEnvelope, faPhone, faMapMarkerAlt } from '@fortawesome/free-solid-svg
 import { faGithub, faLinkedin, faTwitter } from '@fortawesome/free-brands-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState } from 'react';
-
+import { supabase } from '../createClient'
 
 function Contact() {
-   const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState({
     name: '',
     email: '',
     message: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'success' | 'error' | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    console.log("input changed", {name, value});
     setFormData((prev) => ({ ...prev, [name]: value }));
+    console.log('New form data after update:', formData);
+    
+    // Clear error message when user starts typing
+    if (errorMessage) setErrorMessage('');
+  };
+
+  // Validate form before submission
+  const validateForm = () => {
+    if (!formData.name.trim()) {
+      setErrorMessage('Name is required');
+      return false;
+    }
+    
+    if (!formData.email.trim()) {
+      setErrorMessage('Email is required');
+      return false;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setErrorMessage('Please enter a valid email address');
+      return false;
+    }
+    
+    if (!formData.message.trim()) {
+      setErrorMessage('Message is required');
+      return false;
+    }
+    
+    if (formData.message.trim().length < 10) {
+      setErrorMessage('Message must be at least 10 characters');
+      return false;
+    }
+    
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    // Validate before submitting
+    if (!validateForm()) {
+      return;
+    }
+    
     setIsSubmitting(true);
     setSubmitStatus(null);
+    setErrorMessage('');
 
     try {
-      const response = await fetch('/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      if (response.ok) {
-        setSubmitStatus('success');
-        setFormData({ name: '', email: '', message: '' });
-      } else {
+      console.log('Submitting to Supabase:', formData);
+      
+      // Insert data into Supabase
+      const { data, error } = await supabase
+        .from('contacts')
+        .insert([
+          {
+            name: formData.name.trim(),
+            email: formData.email.trim().toLowerCase(),
+            message: formData.message.trim(),
+            created_at: new Date().toISOString(),
+            status: 'unread'
+          }
+        ])
+        .select();
+
+      if (error) {
+        console.error('Supabase error:', error);
+        
+        // Handle specific Supabase errors
+        if (error.code === '42501') {
+          setErrorMessage('Permission denied. Please check Row Level Security settings.');
+        } else if (error.code === '42P01') {
+          setErrorMessage('Database table not found. Please run the setup SQL.');
+        } else {
+          setErrorMessage(error.message || 'Failed to save your message. Please try again.');
+        }
+        
         setSubmitStatus('error');
+      } else {
+        console.log('Successfully saved to Supabase:', data);
+        setSubmitStatus('success');
+        
+        // Clear form on success
+        setFormData({ 
+          name: '', 
+          email: '', 
+          message: '' 
+        });
       }
     } catch (error) {
       console.error('Submission error:', error);
+      setErrorMessage('Network error. Please check your connection and try again.');
       setSubmitStatus('error');
     } finally {
       setIsSubmitting(false);
-      setTimeout(() => setSubmitStatus(null), 5000);
+      setTimeout(() => {
+        setSubmitStatus(null);
+        setErrorMessage('');
+      }, 5000);
     }
   };
 
@@ -51,10 +128,10 @@ function Contact() {
       <div className="contact-container">
         <div className="contact-header">
           <span className="contact-badge">Get in touch</span>
-          <h2 className="contact-title">Let's Work Together</h2>
+        <h2 className="contact-title">{"Let's Work Together"}</h2>
           <div className="contact-underline"></div>
           <p className="contact-subtitle">
-            Have a project in mind or just want to say hello? I'll get back to you within 24 hours.
+            {"Have a project in mind or just want to say hello? I'll get back to you within 24 hours."}
           </p>
         </div>
 
@@ -67,7 +144,7 @@ function Contact() {
                 <span className="contact-icon">
                     <FontAwesomeIcon icon={faEnvelope} />
                 </span>
-                <a href="mailto:hello@mathewsonialaodoyo.com">hello@mathewsonialaodoyo.com</a>
+                <a href="mailto:mathewsonialaodoyo@gmail.com">mathewsonialaodoyo@gmail.com</a>
               </div>
               <div className="contact-item">
                 <span className="contact-icon">
@@ -83,13 +160,13 @@ function Contact() {
               </div>
             </div>
             <div className="contact-social">
-              <a href="#" className="social-link" aria-label="GitHub">
+              <a href="https://github.com/mathewsoniala" className="social-link" aria-label="GitHub">
                 <FontAwesomeIcon icon={faGithub} />
               </a>
-              <a href="#" className="social-link" aria-label="LinkedIn">
+              <a href="https://www.linkedin.com/in/mathews-oniala-a82927274" className="social-link" aria-label="LinkedIn">
                 <FontAwesomeIcon icon={faLinkedin} />
               </a>
-              <a href="#" className="social-link" aria-label="Twitter">
+              <a href="https://twitter.com/OnialaMathews" className="social-link" aria-label="Twitter">
                 <FontAwesomeIcon icon={faTwitter} />
               </a>
             </div>
@@ -107,6 +184,7 @@ function Contact() {
                 onChange={handleChange}
                 required
                 placeholder="Your name"
+                disabled={isSubmitting}
               />
             </div>
             <div className="form-group">
@@ -119,6 +197,7 @@ function Contact() {
                 onChange={handleChange}
                 required
                 placeholder="you@example.com"
+                disabled={isSubmitting}
               />
             </div>
             <div className="form-group">
@@ -131,16 +210,31 @@ function Contact() {
                 onChange={handleChange}
                 required
                 placeholder="Tell me about your project..."
+                disabled={isSubmitting}
               ></textarea>
             </div>
             <button type="submit" className="submit-btn" disabled={isSubmitting}>
               {isSubmitting ? 'Sending...' : 'Send Message →'}
             </button>
-            {submitStatus === 'success' && (
-              <p className="success-message">✓ Message sent! I will reply soon.</p>
+            
+            {/* Display validation errors */}
+            {errorMessage && (
+              <p className="error-message" style={{ marginTop: '15px' }}>
+                {errorMessage}
+              </p>
             )}
-            {submitStatus === 'error' && (
-              <p className="error-message">✗ Something went wrong. Please try again.</p>
+            
+            {/* Display success/error status */}
+            {submitStatus === 'success' && (
+              <p className="success-message" style={{ marginTop: '15px' }}>
+                {"✓ Message sent successfully! I'll get back to you soon."}
+              </p>
+            )}
+            
+            {submitStatus === 'error' && !errorMessage && (
+              <p className="error-message" style={{ marginTop: '15px' }}>
+                Something went wrong. Please try again.
+              </p>
             )}
           </form>
         </div>
